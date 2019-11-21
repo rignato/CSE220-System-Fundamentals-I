@@ -1,0 +1,85 @@
+ 
+0 deg       90 deg      180 deg     270 deg     360 deg
+
+O Piece
+
+ROW: 2      2           2           2           2
+COL: 2      2           2           2           2
+                
+OO          OO          OO          OO          OO
+OO          OO          OO          OO          OO
+
+"OOOO.."    "OOOO.."    "OOOO.."    "OOOO.."    "OOOO.."
+
+
+I Piece
+
+ROW: 4      1           4           1           4
+COL: 1      4           1           4           1
+
+O           OOOO        O           OOOO        O
+O                       O                       O
+O                       O                       O
+O                       O                       O
+
+"OOOO.."    "OOOO.."    "OOOO.."    "OOOO.."    "OOOO.."
+
+
+S Piece
+
+ROW: 2      3           2           3           2
+COL: 3      2           3           2           3
+
+.OO         O.          .OO         O.          .OO
+OO.         OO          OO.         OO          OO.
+            .O                      .O
+             
+".OOOO."    "O.OO.O"    ".OOOO."    "O.OO.O"    ".OOOO."
+
+
+Z Piece
+
+ROW: 2      3           2           3           2
+COL: 3      2           3           2           3
+    
+OO.         .O          OO.         .O          OO.
+.OO         OO          .OO         OO          .OO
+            O.                      O.
+
+"OO..OO"    ".OOOO."    "OO..OO"    ".OOOO."    "OO..OO"
+
+
+L Piece 
+
+ROW: 3      2           3           2           3
+COL: 2      3           2           3           2
+
+O.          OOO         OO          ..O         O.
+O.          O..         .O          OOO         O.
+OO                      .O                      OO
+
+"O.O.OO"    "OOOO.."    "OO.O.O"    "..OOOO"    "O.O.OO"
+
+
+J Piece
+
+ROW: 3      2           3           2           3
+COL: 2      3           2           3           2
+
+.O          O..         OO          OOO         .O
+.O          OOO         O.          ..O         .O
+OO                      O.                      OO
+
+".O.OOO"    "O..OOO"    "OOO.O."    "OOO..O"    ".O.OOO"
+
+
+T Piece
+
+ROW: 2      3           2           3           2
+COL: 3      2           3           2           3
+
+OOO         .O          .O.         O.          OOO
+.O.         OO          OOO         OO          .O.
+            .O                      O.
+
+"OOO.O."    ".OOO.O"    ".O.OOO"    "O.OOO."    "OOO.O."
