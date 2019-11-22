@@ -69,7 +69,11 @@ get_frag_offset:
 set_frag_offset:
 # $a0 = packet_ptr
 # $a1 = new_frag_offset
-	
+	lhu $t0, 4($a0)
+	andi $t0, $t0, 0x0000f000
+	or $t0, $t0, $a1
+	sh $t0, 4($a0)
+	jr $ra
 
 get_protocol:
 # $a0 = packet_ptr
@@ -80,6 +84,16 @@ get_protocol:
 	srl $v0, $v0, 12
 	jr $ra
 	
+set_protocol:
+# $a0 = packet_ptr
+# $a1 = new_protocol
+	lw $t0, 4($a0)
+	andi $t0, $t0, 0xffc00fff
+	sll $t1, $a1, 12
+	or $t0, $t0, $t1
+	sw $t0, 4($a0)
+	jr $ra
+	
 get_flags:
 # $a0 = packet_ptr
 #
@@ -88,26 +102,54 @@ get_flags:
 	andi $v0, $v0, 0x000000c0
 	srl $v0, $v0, 6
 	jr $ra
-	
+
+set_flags:
+# $a0 = packet_ptr
+# $a1 = new_flags
+	lbu $t0, 6($a0)
+	andi $t0, $t0, 0x0000003f
+	sll $t1, $a1, 6
+	or $t0, $t0, $t1
+	sb $t0, 6($a0)
+	jr $ra
+
 get_priority:
 # $a0 = packet_ptr
 #
 # $v0 = priority
 	lbu $v0, 7($a0)
 	jr $ra
-	
-get_dest_addr:
+
+set_priority:
 # $a0 = packet_ptr
-#
-# $v0 = dest_addr
-	lbu $v0, 8($a0)
+# $a1 = new_priority
+	sb $a1, 7($a0)
 	jr $ra
-	
+
 get_src_addr:
 # $a0 = packet_ptr
 #
 # $v0 = src_addr
+	lbu $v0, 8($a0)
+	jr $ra
+
+set_src_addr:
+# $a0 = packet_ptr
+# $a1 = new_src_addr
+	sb $a1, 8($a0)
+	jr $ra
+
+get_dest_addr:
+# $a0 = packet_ptr
+#
+# $v0 = dest_addr
 	lbu $v0, 9($a0)
+	jr $ra
+	
+set_dest_addr:
+# $a0 = packet_ptr
+# $a1 = new_dest_addr
+	sb $a1, 9($a0)
 	jr $ra
 
 get_checksum:
@@ -116,7 +158,13 @@ get_checksum:
 # $v0 = checksum
 	lhu $v0, 10($a0)
 	jr $ra
-	
+
+set_checksum:
+# $a0 = packet_ptr
+# $a1 = new_checksum
+	sh $a1, 10($a0)
+	jr $ra
+
 print_payload:
 # $a0 = packet_ptr
 	addi $sp, $sp, -4
@@ -125,7 +173,7 @@ print_payload:
 	jal get_total_length
 	addi $t2, $a0, 12
 	move $t1, $v0
-	li $t0, 0
+	li $t0, 12
 	print_payload.loop:
 		beq $t0, $t1, print_payload.endloop
 		lbu $a0, 0($t2)
