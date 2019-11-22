@@ -15,6 +15,12 @@ get_total_length:
 # $v0 = total_length
 	lhu $v0, 0($a0)
 	jr $ra
+	
+set_total_length:
+# $a0 = packet_ptr
+# $a1 = new_total_length
+	sh $a1, 0($a0)
+	jr $ra
 
 get_msg_id:
 # $a0 = packet_ptr
@@ -22,6 +28,15 @@ get_msg_id:
 # $v0 = msg_id
 	lhu $v0, 2($a0)
 	andi $v0, $v0, 0x00000fff
+	jr $ra
+
+set_msg_id:
+# $a0 = packet_ptr
+# $a1 = new_msg_id
+	lhu $t0, 2($a0)
+	andi $t0, $t0, 0x0000f000
+	or $t0, $t0, $a1
+	sh $t0, 2($a0)
 	jr $ra
 
 get_version:
@@ -33,6 +48,16 @@ get_version:
 	srl $v0, $v0, 4
 	jr $ra
 	
+set_version:
+# $a0 = packet_ptr
+# $a1 = new_version
+	lbu $t0, 3($a0)
+	andi $t0, $t0, 0x0000000f
+	sll $t1, $a1, 4
+	or $t0, $t0, $t1
+	sb $t0, 3($a0)
+	jr $ra
+	
 get_frag_offset:
 # $a0 = packet_ptr
 #
@@ -40,7 +65,12 @@ get_frag_offset:
 	lhu $v0, 4($a0)
 	andi $v0, $v0, 0x00000fff
 	jr $ra
+
+set_frag_offset:
+# $a0 = packet_ptr
+# $a1 = new_frag_offset
 	
+
 get_protocol:
 # $a0 = packet_ptr
 #
@@ -86,7 +116,145 @@ get_checksum:
 # $v0 = checksum
 	lhu $v0, 10($a0)
 	jr $ra
+	
+print_payload:
+# $a0 = packet_ptr
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	jal get_total_length
+	addi $t2, $a0, 12
+	move $t1, $v0
+	li $t0, 0
+	print_payload.loop:
+		beq $t0, $t1, print_payload.endloop
+		lbu $a0, 0($t2)
+		li $v0, 11
+		syscall
+		addi $t0, $t0, 1
+		addi $t2, $t2, 1
+		j print_payload.loop
+	print_payload.endloop:
+	
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	jr $ra
 
+print_packet:
+# $a0 = packet_ptr
+	addi $sp, $sp, -8
+	sw $ra, 0($sp)
+	sw $s0, 4($sp)
+	
+	move $s0, $a0
+	
+	jal get_version
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	move $a0, $s0
+	jal get_msg_id
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	move $a0, $s0
+	jal get_total_length
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	move $a0, $s0
+	jal get_priority
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	move $a0, $s0
+	jal get_flags
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	move $a0, $s0
+	jal get_protocol
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	move $a0, $s0
+	jal get_frag_offset
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	move $a0, $s0
+	jal get_checksum
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	move $a0, $s0
+	jal get_src_addr
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	move $a0, $s0
+	jal get_dest_addr
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	move $a0, $s0
+	jal print_payload
+	
+	lw $ra, 0($sp)
+	lw $s0, 4($sp)
+	addi $sp, $sp, 8
+	jr $ra
+	
 compute_checksum:
 # $a0 = packet_ptr
 # 
@@ -208,7 +376,19 @@ compare_to:
 	jr $ra
 
 packetize:
-jr $ra
+# $a0 = byte[] packet_date
+# $a1 = string msg
+# $a2 = int payload_size
+# $a3 = int version
+# 0($sp) = int msg_id
+# 4($sp) = int priority
+# 8($sp) = int protocol
+# 12($sp) = int src_addr
+# 16($sp) = int dest_addr
+#
+# $v0 = number of packets created
+	
+	jr $ra
 
 clear_queue:
 jr $ra
