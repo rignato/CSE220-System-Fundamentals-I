@@ -38,6 +38,9 @@ p07:
 .globl main
 main:
 la $a0, queue
+jal print_queue
+
+la $a0, queue
 lw $a1, packet
 jal enqueue
 move $s0, $v0
@@ -55,6 +58,9 @@ li $v0, 11
 syscall
 
 # You will need to write your own code here to check the contents of the queue.
+
+la $a0, queue
+jal print_queue
 
 li $v0, 10
 syscall

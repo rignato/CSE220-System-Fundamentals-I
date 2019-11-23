@@ -196,6 +196,96 @@ print_packet:
 	
 	move $s0, $a0
 	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	move $a0, $s0
+	jal get_total_length
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	move $a0, $s0
+	jal get_frag_offset
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	move $a0, $s0
+	jal print_payload
+	
+	lw $ra, 0($sp)
+	lw $s0, 4($sp)
+	addi $sp, $sp, 8
+	jr $ra
+
+print_queue:
+# $a0 = queue_ptr
+	addi $sp, $sp, -16
+	sw $ra, 0($sp)
+	sw $s0, 4($sp)
+	sw $s1, 8($sp)
+	sw $s2, 12($sp)
+	
+	move $s0, $a0
+	
+	lhu $a0, 0($s0)
+	move $s1, $a0
+	li $v0, 1
+	syscall
+	
+	li $a0, '\n'
+	li $v0, 11
+	syscall
+	
+	lhu $a0, 2($s0)
+	li $v0, 1
+	syscall
+	
+	li $a0, '\n'
+	li $v0, 11
+	syscall
+	
+	li $s2, 0
+	print_queue.loop:
+		beq $s2, $s1, print_queue.endloop
+		sll $t0, $s2, 2
+		add $t0, $t0, $s0
+		lw $a0, 4($t0)
+		jal print_packet
+		
+		li $a0, '\n'
+		li $v0, 11
+		syscall
+		
+		addi $s2, $s2, 1
+		j print_queue.loop
+	print_queue.endloop:
+	
+	lw $ra, 0($sp)
+	lw $s0, 4($sp)
+	lw $s1, 8($sp)
+	lw $s2, 12($sp)
+	addi $sp, $sp, 16
+	jr $ra
+
+print_packet_verbose:
+# $a0 = packet_ptr
+	addi $sp, $sp, -8
+	sw $ra, 0($sp)
+	sw $s0, 4($sp)
+	
+	move $s0, $a0
+	
 	jal get_version
 	move $a0, $v0
 	li $v0, 1
@@ -539,10 +629,141 @@ packetize:
 	jr $ra
 
 clear_queue:
-jr $ra
+# $a0 = PriorityQueue* queue
+# $a1 = max_queue_size
+#
+# $v0 = 0 if max_queue_size > 0 else -1
+	li $v0, -1
+	blez $a1, clear_queue.exit
+	
+	sh $0, 0($a0)	 # queue.size = 0
+	sh $a1, 2($a0)   # queue.max_queue_size = max_queue_size
+	
+	li $t0, 0
+	addi $t1, $a0, 4
+	clear_queue.loop:
+		beq $t0, $a1, clear_queue.endloop
+		sw $0, 0($t1)
+		addi $t0, $t0, 1
+		addi $t1, $t1, 4
+		j clear_queue.loop
+	clear_queue.endloop:
+	li $v0, 0
+	
+	clear_queue.exit:
+	jr $ra
+
+get_packet_at_index:
+# $a0 = PriorityQueue* queue
+# $a1 = int index
+# 
+# $v0 = Packet* packet_at_index
+	li $v0, -1
+	bltz $a1, get_packet_at_index.exit
+	lhu $t0, 2($a0)
+	bge $a1, $t0, get_packet_at_index.exit
+	
+	sll $t0, $a1, 2
+	add $t0, $a0, $t0
+	lw $v0, 4($t0)
+	
+	get_packet_at_index.exit:
+	jr $ra
+
+set_packet_at_index:
+# $a0 = PriorityQueue* queue
+# $a1 = int index
+# $a2 = Packet* packet
+	bltz $a1, set_packet_at_index.exit
+	lhu $t0, 2($a0)
+	bge $a1, $t0, set_packet_at_index.exit
+	
+	sll $t0, $a1, 2		# index_addr in queue = size * 4
+	add $t0, $a0, $t0	# spot_addr = queue_ptr + index_addr
+	sw $a2, 4($t0)		# store packet in spot_addr
+	
+	set_packet_at_index.exit:
+	jr $ra
 
 enqueue:
-jr $ra
+# $a0 = PriorityQueue* queue
+# $a1 = Packet* packet
+#
+# $v0 = the size of the queue after the insertion has taken place or queue.max_size if queue is full
+	lhu $t0, 0($a0)
+	lhu $v0, 2($a0)
+	beq $t0, $v0, enqueue.exit
+	
+	addi $sp, $sp, -24
+	sw $ra, 0($sp)
+	sw $s0, 4($sp)
+	sw $s1, 8($sp)
+	sw $s2, 12($sp)
+	sw $s3, 16($sp)
+	sw $s4, 20($sp)
+	
+	move $s0, $a0
+	move $s1, $a1
+	move $s2, $t0		# child_index = size - 1
+	
+	addi $t0, $t0, 1
+	sh $t0, 0($s0)		# size++
+	
+	move $a1, $s2
+	move $a2, $s1
+	jal set_packet_at_index
+	
+	addi $s3, $s2, -1
+	srl $s3, $s3, 1		# parent_index = (child_index - 1) / 2
+	
+	heapify_up.loop:
+		beqz $s2, heapify_up.endloop
+		
+		# get parent packet
+		move $a0, $s0
+		move $a1, $s3
+		jal get_packet_at_index
+		move $s4, $v0
+		
+		# compare child and parent
+		move $a0, $s1
+		move $a1, $s4
+		jal compare_to
+		
+		# exit if child >= parent
+		bgez $v0, heapify_up.endloop
+		
+		# swap parent and child
+		move $a0, $s0
+		move $a1, $s2
+		move $a2, $s4
+		jal set_packet_at_index
+		
+		move $a0, $s0
+		move $a1, $s3
+		move $a2, $s1
+		jal set_packet_at_index
+		
+		move $s2, $s3			# child = parent
+		
+		addi $s3, $s2, -1
+		srl $s3, $s3, 1			# parent_index = (child_index - 1) / 2
+		
+		j heapify_up.loop
+	heapify_up.endloop:
+	
+	lhu $v0, 0($s0)
+	
+	lw $ra, 0($sp)
+	lw $s0, 4($sp)
+	lw $s1, 8($sp)
+	lw $s2, 12($sp)
+	lw $s3, 16($sp)
+	lw $s4, 20($sp)
+	addi $sp, $sp, 24
+	
+	enqueue.exit:
+	jr $ra
 
 dequeue:
 jr $ra
