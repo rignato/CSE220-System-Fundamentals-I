@@ -1,9 +1,9 @@
 .data
 .align 2
 packets: .space 141  # adjust as needed to store all bytes of the packets
-msg: .asciiz "Grace Murray Hopper was one of the first computer programmers to work on the Harvard Mark I. "
+msg: .asciiz "Grace Murray Hopper was one of the first computer programmers to work on the Harvard Mark I."
 .align 2
-payload_size: .word 24
+payload_size: .word 12
 version: .word 5
 msg_id: .word 154
 priority: .word 7
@@ -48,6 +48,26 @@ li $v0, 11
 syscall
 
 # You should consider writing some code here to print out the contents of the packets[] array.
+li $s1, 0
+la $s2, packets
+print_packets.loop:
+	beq $s1, $s0, print_packets.endloop
+	move $a0, $s2
+	jal print_packet
+	
+	li $a0, '\n'
+	li $v0, 11
+	syscall
+	syscall
+	
+	addi $s1, $s1, 1
+	
+	move $a0, $s2
+	jal get_total_length
+	add $s2, $s2, $v0
+	j print_packets.loop
+print_packets.endloop:
+
 
 li $v0, 10
 syscall

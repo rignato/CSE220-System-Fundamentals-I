@@ -349,12 +349,12 @@ compute_checksum:
 	add $v0, $v0, $t0
 	sh $v0, 0($sp)
 	
-	jal get_dest_addr
+	jal get_src_addr
 	lhu $t0, 0($sp)
 	add $v0, $v0, $t0
 	sh $v0, 0($sp)
 	
-	jal get_src_addr
+	jal get_dest_addr
 	lhu $t0, 0($sp)
 	add $v0, $v0, $t0
 	
@@ -435,7 +435,107 @@ packetize:
 # 16($sp) = int dest_addr
 #
 # $v0 = number of packets created
+	addi $sp, $sp, -40
+	sw $ra, 0($sp)
+	sw $s0, 4($sp)
+	sw $s1, 8($sp)
+	sw $s2, 12($sp)
+	sw $s3, 16($sp)
+	sw $s4, 20($sp)
+	sw $s5, 24($sp)
+	sw $s6, 28($sp)
+	sw $s7, 32($sp)
+	sw $fp, 36($sp)
 	
+	move $s0, $a0
+	move $s1, $a1
+	move $s2, $a2
+	move $s3, $a3
+	addi $fp, $sp, 40
+	
+	li $s4, 0			# frag_offset = 0
+	li $s7, 0			# packets = 0
+	packetize.loop:
+		li $s5, 0		# msg_len_for_packet = 0
+		li $s6, 1		# flag = 1
+		addi $t0, $s0, 12
+		packetize.payload_loop:
+			beq $s5, $s2, packetize.end_payload_loop
+			lbu $t1, 0($s1)
+			sb  $t1, 0($t0)
+			beqz $t1, packetize.final_packet
+			addi $s1, $s1, 1
+			addi $t0, $t0, 1
+			addi $s5, $s5, 1
+			j packetize.payload_loop
+			packetize.final_packet:
+				li $s6, 0
+		packetize.end_payload_loop:
+		
+		move $a0, $s0
+		addi $a1, $s5, 12
+		jal set_total_length
+		
+		move $a0, $s0
+		lhu $a1, 0($fp)
+		jal set_msg_id
+		
+		move $a0, $s0
+		move $a1, $s3
+		jal set_version
+		
+		move $a0, $s0
+		move $a1, $s4
+		jal set_frag_offset
+		
+		move $a0, $s0
+		lhu $a1, 8($fp)
+		jal set_protocol
+		
+		move $a0, $s0
+		move $a1, $s6
+		jal set_flags
+		
+		move $a0, $s0
+		lbu $a1, 4($fp)
+		jal set_priority
+		
+		move $a0, $s0
+		lbu $a1, 12($fp)
+		jal set_src_addr
+		
+		move $a0, $s0
+		lbu $a1, 16($fp)
+		jal set_dest_addr
+		
+		move $a0, $s0
+		jal compute_checksum
+		move $a0, $s0
+		move $a1, $v0
+		jal set_checksum
+		
+		move $a0, $s0
+		jal get_total_length
+		add $s0, $s0, $v0				# increment packet_ptr by total_length (move on to next packet)
+		
+		add $s4, $s4, $s2				# frag_offset += payload_size
+		addi $s7, $s7, 1				# packets++
+		bgtz $s6, packetize.loop
+	packetize.endloop:
+	
+	move $v0, $s7
+	
+	lw $ra, 0($sp)
+	lw $s0, 4($sp)
+	lw $s1, 8($sp)
+	lw $s2, 12($sp)
+	lw $s3, 16($sp)
+	lw $s4, 20($sp)
+	lw $s5, 24($sp)
+	lw $s6, 28($sp)
+	lw $s7, 32($sp)
+	lw $fp, 36($sp)
+	addi $sp, $sp, 40
 	jr $ra
 
 clear_queue:
