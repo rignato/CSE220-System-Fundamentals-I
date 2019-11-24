@@ -77,6 +77,9 @@ syscall
 
 # You will need to write your own code here to check the contents of the queue.
 
+la $a0, queue
+jal print_queue
+
 li $v0, 10
 syscall
 

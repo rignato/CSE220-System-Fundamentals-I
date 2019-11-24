@@ -450,50 +450,62 @@ compute_checksum:
 #
 # checksum formula: 
 # (version + msg_id + total_length + priority + flags + protocol + frag_offset + src_addr + dest_addr) mod 2^16
-	addi $sp, $sp, -4
+	addi $sp, $sp, -8
 	sw $ra, 0($sp)
+	sw $s0, 4($sp)
+	
+	move $s0, $a0
 	
 	addi $sp, $sp, -2	# allocate stack buffer
 	sh $0, 0($sp)		# clear data in stack buffer
 	
+	move $a0, $s0
 	jal get_total_length
 	sh $v0, 0($sp)
 	
+	move $a0, $s0
 	jal get_msg_id
 	lhu $t0, 0($sp)
 	add $v0, $v0, $t0
 	sh $v0, 0($sp)
 	
+	move $a0, $s0
 	jal get_version
 	lhu $t0, 0($sp)
 	add $v0, $v0, $t0
 	sh $v0, 0($sp)
 	
+	move $a0, $s0
 	jal get_frag_offset
 	lhu $t0, 0($sp)
 	add $v0, $v0, $t0
 	sh $v0, 0($sp)
 	
+	move $a0, $s0
 	jal get_protocol
 	lhu $t0, 0($sp)
 	add $v0, $v0, $t0
 	sh $v0, 0($sp)
 	
+	move $a0, $s0
 	jal get_flags
 	lhu $t0, 0($sp)
 	add $v0, $v0, $t0
 	sh $v0, 0($sp)
 	
+	move $a0, $s0
 	jal get_priority
 	lhu $t0, 0($sp)
 	add $v0, $v0, $t0
 	sh $v0, 0($sp)
 	
+	move $a0, $s0
 	jal get_src_addr
 	lhu $t0, 0($sp)
 	add $v0, $v0, $t0
 	sh $v0, 0($sp)
 	
+	move $a0, $s0
 	jal get_dest_addr
 	lhu $t0, 0($sp)
 	add $v0, $v0, $t0
@@ -505,7 +517,8 @@ compute_checksum:
 	mfhi $v0
 	
 	lw $ra, 0($sp)
-	addi $sp, $sp, 4
+	lw $s0, 4($sp)
+	addi $sp, $sp, 8
 	jr $ra
 
 compare_to:
@@ -987,7 +1000,82 @@ dequeue:
 	jr $ra
 
 assemble_message:
-jr $ra
+# $a0 = char[] msg
+# $a1 = PriorityQueue* queue
+#
+# $v0 = number of packets dequeued
+# $v1 = number of packets that failed checksum test
+	li $v0, 0
+	li $v1, 0
+	
+	lhu $t0, 0($a1)
+	beqz $t0, assemble_message.exit	
+	
+	addi $sp, $sp, -28
+	sw $ra, 0($sp)
+	sw $s0, 4($sp)
+	sw $s1, 8($sp)
+	sw $s2, 12($sp)
+	sw $s3, 16($sp)
+	sw $s4, 20($sp)
+	sw $s5, 24($sp)
+	
+	move $s0, $a0
+	move $s1, $a1
+	li $s2, 0
+	li $s3, 0
+	assemble_message.packet_loop:
+		move $a0, $s1
+		jal dequeue
+		beqz $v0, assemble_message.packet_endloop
+		addi $s2, $s2, 1
+		move $s4, $v0
+		
+		move $a0, $s4
+		jal compute_checksum
+		move $s5, $v0
+		
+		move $a0, $s4
+		jal get_checksum
+		beq $v0, $s5, assemble_message.valid
+		addi $s3, $s3, 1
+		assemble_message.valid:
+		
+		move $a0, $s4
+		jal get_frag_offset
+		move $s5, $v0
+		
+		move $a0, $s4
+		jal get_total_length
+		addi $t3, $v0, -12
+		
+		add $t0, $s5, $s0		# i = frag_offset + msg_addr
+		add $t1, $t0, $t3		# j = i + msg_size
+		# while i < j
+		assemble_message.write_loop:
+			beq $t0, $t1, assemble_message.write_endloop
+			lbu $t2, 12($s4)	# get char in payload
+			sb $t2, 0($t0)		# write char in msg[i]
+			addi $t0, $t0, 1	# i++
+			addi $s4, $s4, 1	# payload_ptr++
+			j assemble_message.write_loop
+		assemble_message.write_endloop:
+		j assemble_message.packet_loop
+	assemble_message.packet_endloop:
+	
+	move $v0, $s2
+	move $v1, $s3
+	
+	lw $ra, 0($sp)
+	lw $s0, 4($sp)
+	lw $s1, 8($sp)
+	lw $s2, 12($sp)
+	lw $s3, 16($sp)
+	lw $s4, 20($sp)
+	lw $s5, 24($sp)
+	addi $sp, $sp, 28
+	assemble_message.exit:
+	jr $ra
 
 
 #################### DO NOT CREATE A .data SECTION ####################
