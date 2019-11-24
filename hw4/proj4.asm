@@ -126,29 +126,29 @@ set_priority:
 	sb $a1, 7($a0)
 	jr $ra
 
-get_src_addr:
-# $a0 = packet_ptr
-#
-# $v0 = src_addr
-	lbu $v0, 8($a0)
-	jr $ra
-
-set_src_addr:
-# $a0 = packet_ptr
-# $a1 = new_src_addr
-	sb $a1, 8($a0)
-	jr $ra
-
 get_dest_addr:
 # $a0 = packet_ptr
 #
 # $v0 = dest_addr
-	lbu $v0, 9($a0)
+	lbu $v0, 8($a0)
 	jr $ra
 	
 set_dest_addr:
 # $a0 = packet_ptr
 # $a1 = new_dest_addr
+	sb $a1, 8($a0)
+	jr $ra
+	
+get_src_addr:
+# $a0 = packet_ptr
+#
+# $v0 = src_addr
+	lbu $v0, 9($a0)
+	jr $ra
+
+set_src_addr:
+# $a0 = packet_ptr
+# $a1 = new_src_addr
 	sb $a1, 9($a0)
 	jr $ra
 
@@ -186,6 +186,56 @@ print_payload:
 	
 	lw $ra, 0($sp)
 	addi $sp, $sp, 4
+	jr $ra
+
+print_packet_for_queue:
+# $a0 = packet_ptr
+	addi $sp, $sp, -12
+	sw $ra, 0($sp)
+	sw $s0, 4($sp)
+	sw $s1, 8($sp)
+	
+	move $s0, $a0
+	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	li $a0, 'P'
+	syscall
+	
+	move $a0, $s0
+	jal get_frag_offset
+	move $s1, $v0
+	
+	move $a0, $s0
+	jal get_total_length
+	addi $v0, $v0, -12
+	
+	div $s1, $v0
+	
+	mflo $a0
+	li $v0, 1
+	syscall
+	
+	li $a0, ':'
+	li $v0, 11
+	syscall
+	li $a0 ' '
+	syscall
+	
+	move $a0, $s0
+	li $v0, 34
+	syscall
+	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	lw $ra, 0($sp)
+	lw $s0, 4($sp)
+	lw $s1, 8($sp)
+	addi $sp, $sp, 12
 	jr $ra
 
 print_packet:
@@ -261,7 +311,7 @@ print_queue:
 		sll $t0, $s2, 2
 		add $t0, $t0, $s0
 		lw $a0, 4($t0)
-		jal print_packet
+		jal print_packet_for_queue
 		
 		li $a0, '\n'
 		li $v0, 11
@@ -708,6 +758,7 @@ enqueue:
 	
 	addi $t0, $t0, 1
 	sh $t0, 0($s0)		# size++
+	beqz $s2, heapify_up.endloop
 	
 	move $a1, $s2
 	move $a2, $s1
@@ -766,7 +817,174 @@ enqueue:
 	jr $ra
 
 dequeue:
-jr $ra
+# $a0 = PriorityQueue* queue
+#
+# $v0 = address of dequeued packet or 0 if empty queue
+	lhu $v0, 0($a0)
+	beqz $v0, dequeue.exit
+	
+	addi $sp, $sp, -32
+	sw $ra, 0($sp)
+	sw $s0, 4($sp)
+	sw $s1, 8($sp)
+	sw $s2, 12($sp)
+	sw $s3, 16($sp)
+	sw $s4, 20($sp)
+	sw $s5, 24($sp)
+	sw $s6, 28($sp)
+	move $s0, $a0 
+	
+	lw $s1, 4($s0)		# load root to dequeue
+	sw $0, 4($s0)		# set root to 0
+	addi $t0, $v0, -1
+	sh $t0, 0($s0)		# size--
+	beqz $t0, heapify_down.endloop	# finish if size = 0
+	
+	move $a1, $t0
+	jal get_packet_at_index			# load packet at index (size-1)
+	move $s2, $v0
+	sw $s2, 4($s0)					# set root to packet at index (size-1)
+	
+	li $s3, 0			# parent index = 0 (root)
+	heapify_down.loop:
+		# check bounds of parent
+		lhu $t0, 0($s0)
+		bge $s3, $t0, heapify_down.endloop
+		
+		# check bounds of left child
+		sll $s6, $s3, 1
+		addi $a1, $s6, 1
+		bge $a1, $t0, heapify_down.endloop
+		
+		# end heapify if left child is null
+		move $a0, $s0
+		jal get_packet_at_index
+		beqz $v0, heapify_down.endloop
+		move $s4, $v0
+		
+		# check bounds of right child
+		addi $a1, $s6, 2
+		lhu $t0, 0($s0)
+		bge $a1, $t0, heapify_down.one_child
+		
+		move $a0, $s0
+		jal get_packet_at_index
+		beqz $v0, heapify_down.one_child
+		move $s5, $v0
+		
+		# check which child is smaller
+		move $a0, $s4
+		move $a1, $s5
+		jal compare_to
+		beqz $v0, heapify_down.children_equal
+		bltz $v0, heapify_down.left_smaller
+		
+		# if right child smaller, check if it is smaller than parent
+		move $a0, $s2
+		move $a1, $s5
+		jal compare_to
+		# if right child >= parent, jump to left smaller
+		blez $v0, heapify_down.left_smaller
+		# otherwise jump to right smaller
+		j heapify_down.right_smaller
+		
+		heapify_down.left_smaller:
+			# if left child >= parent, jump to right smaller
+			move $a0, $s2
+			move $a1, $s4
+			jal compare_to
+			blez $v0, heapify_down.right_smaller
+			
+			# swap parent with left child
+			move $a0, $s0
+			move $a1, $s3
+			move $a2, $s4
+			jal set_packet_at_index
+			
+			move $a0, $s0
+			addi $a1, $s6, 1
+			move $a2, $s2
+			jal set_packet_at_index
+			
+			j heapify_down.continue_left
+			
+		heapify_down.right_smaller:
+			# if right child >= parent, end loop
+			move $a0, $s2
+			move $a1, $s5
+			jal compare_to
+			blez $v0, heapify_down.endloop
+			
+			# swap parent with right child
+			move $a0, $s0
+			move $a1, $s3
+			move $a2, $s5
+			jal set_packet_at_index
+			
+			move $a0, $s0
+			addi $a1, $s6, 2
+			move $a2, $s2
+			jal set_packet_at_index
+			
+			j heapify_down.continue_right
+			
+		heapify_down.children_equal:
+			# if left child >= parent, end loop
+			move $a0, $s2
+			move $a1, $s4
+			jal compare_to
+			blez $v0, heapify_down.endloop
+			
+			# swap parent with left child
+			move $a0, $s0
+			move $a1, $s3
+			move $a2, $s4
+			jal set_packet_at_index
+			
+			move $a0, $s0
+			addi $a1, $s6, 1
+			move $a2, $s2
+			jal set_packet_at_index
+			
+			j heapify_down.continue_left
+			
+		heapify_down.continue_right:
+			addi $s6, $s6, 1		# parent = 2*parent + 2 (right child)
+		heapify_down.continue_left:
+			addi $s3, $s6, 1		# parent = 2*parent + 1	(left child)
+			j heapify_down.loop
+		
+		heapify_down.one_child:
+			move $a0, $s2
+			move $a1, $s4
+			jal compare_to
+			blez $v0, heapify_down.endloop
+			
+			# swap parent with left child
+			move $a0, $s0
+			move $a1, $s3
+			move $a2, $s4
+			jal set_packet_at_index
+			
+			move $a0, $s0
+			addi $a1, $s6, 1
+			move $a2, $s2
+			jal set_packet_at_index
+	heapify_down.endloop:
+	move $v0, $s1
+	
+	lw $ra, 0($sp)
+	lw $s0, 4($sp)
+	lw $s1, 8($sp)
+	lw $s2, 12($sp)
+	lw $s3, 16($sp)
+	lw $s4, 20($sp)
+	lw $s5, 24($sp)
+	lw $s6, 28($sp)
+	addi $sp, $sp, 32
+	
+	dequeue.exit:
+	jr $ra
 
 assemble_message:
 jr $ra

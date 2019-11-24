@@ -36,7 +36,20 @@ p07:
 .globl main
 main:
 la $a0, queue
+jal print_queue
+la $a0, queue
 jal dequeue
+
+move $a0, $v0
+li $v0, 34
+syscall
+
+li $a0, '\n'
+li $v0, 11
+syscall
+
+la $a0, queue
+jal print_queue
 
 move $s0, $v0  # save pointer to returned packet
 

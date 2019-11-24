@@ -24,6 +24,9 @@ li $a0, '\n'
 li $v0, 11
 syscall
 
+la $a0, packet
+jal print_packet
+
 li $v0, 10
 syscall
 
