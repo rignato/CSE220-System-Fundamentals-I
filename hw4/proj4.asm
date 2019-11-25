@@ -261,7 +261,27 @@ print_packet:
 	syscall
 	
 	move $a0, $s0
+	jal get_flags
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	move $a0, $s0
 	jal get_frag_offset
+	move $a0, $v0
+	li $v0, 1
+	syscall
+	
+	li $a0, '\n'	
+	li $v0, 11
+	syscall
+	
+	move $a0, $s0
+	jal get_checksum
 	move $a0, $v0
 	li $v0, 1
 	syscall
@@ -616,10 +636,10 @@ packetize:
 			beq $s5, $s2, packetize.end_payload_loop
 			lbu $t1, 0($s1)
 			sb  $t1, 0($t0)
+			addi $s5, $s5, 1
 			beqz $t1, packetize.final_packet
 			addi $s1, $s1, 1
 			addi $t0, $t0, 1
-			addi $s5, $s5, 1
 			j packetize.payload_loop
 			packetize.final_packet:
 				li $s6, 0
@@ -663,6 +683,7 @@ packetize:
 		
 		move $a0, $s0
 		jal compute_checksum
+		
 		move $a0, $s0
 		move $a1, $v0
 		jal set_checksum
