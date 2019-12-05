@@ -792,11 +792,11 @@ enqueue:
 	
 	addi $t0, $t0, 1
 	sh $t0, 0($s0)		# size++
-	beqz $s2, heapify_up.endloop
 	
 	move $a1, $s2
 	move $a2, $s1
 	jal set_packet_at_index
+	beqz $s2, heapify_up.endloop
 	
 	addi $s3, $s2, -1
 	srl $s3, $s3, 1		# parent_index = (child_index - 1) / 2
